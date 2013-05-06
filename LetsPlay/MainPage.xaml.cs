@@ -10,34 +10,56 @@ using Microsoft.Phone.Shell;
 using LetsPlay.Resources;
 using System.IO.IsolatedStorage;
 using Microsoft.Phone.Tasks;
+using System.Collections.ObjectModel;
 
 namespace LetsPlay
 {
     public partial class MainPage : PhoneApplicationPage
     {
-        List<Clip> clips;
+        ObservableCollection<Clip> clips;
         private string[] fileNames;
         // Constructor
         public MainPage()
         {
             InitializeComponent();
-            clips = new List<Clip>();
+            clips = new ObservableCollection<Clip>();
             //populateClips();
             // Sample code to localize the ApplicationBar
             
         }
 
         private void populateClips(){
-            using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+            string decide = "";
+            if (NavigationContext.QueryString.TryGetValue("pswd", out decide))
             {
-                var pattern = "\\Shared\\Media\\*";//Angel - Wonderful.mp4";
-                fileNames = store.GetFileNames(pattern);
-                foreach (var name in fileNames)
+                if (decide.Equals("true"))
                 {
-                    clips.Add(new Clip { Name = name });
+                    using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+                    {
+                        var pattern = "\\Shared\\Media\\*";//Angel - Wonderful.mp4";
+                        fileNames = store.GetFileNames(pattern);
+                        foreach (var name in fileNames)
+                        {
+                            clips.Add(new Clip { Name = name });
+                        }
+                    }
+                    myList.ItemsSource = clips;
+                    BuildLocalizedApplicationBar();
+                }
+                else
+                {
+                    using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+                    {
+                        var pattern = "\\Shared\\Media\\Angel - Wonderful.mp4";
+                        fileNames = store.GetFileNames(pattern);
+                        foreach (var name in fileNames)
+                        {
+                            clips.Add(new Clip { Name = name });
+                        }
+                    }
+                    myList.ItemsSource = clips;
                 }
             }
-            myList.ItemsSource = clips;
         }
 
         private void selectionChange(object sender, SelectionChangedEventArgs e)
@@ -59,28 +81,9 @@ namespace LetsPlay
         {
             base.OnNavigatedTo(e);
             NavigationService.RemoveBackEntry();
-            string decide = "";
-            if (NavigationContext.QueryString.TryGetValue("pswd", out decide))
-            {
-                if (decide.Equals("true"))
-                {
-                    populateClips();
-                    BuildLocalizedApplicationBar();
-                }
-                else
-                {
-                    using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
-                    {
-                        var pattern = "\\Shared\\Media\\Angel - Wonderful.mp4";
-                        fileNames = store.GetFileNames(pattern);
-                        foreach (var name in fileNames)
-                        {
-                            clips.Add(new Clip { Name = name });
-                        }
-                    }
-                    myList.ItemsSource = clips;
-                }
-            }
+            if (myList.ItemsSource != null)
+                return;
+            populateClips();
         }
 
          //Sample code for building a localized ApplicationBar
@@ -88,6 +91,7 @@ namespace LetsPlay
         {
             // Set the page's ApplicationBar to a new instance of ApplicationBar.
             ApplicationBar = new ApplicationBar();
+            ApplicationBar.Mode = ApplicationBarMode.Minimized;
 
             // Create a new button and set the text value to the localized string from AppResources.
             ApplicationBarIconButton appBarButton = new ApplicationBarIconButton(new Uri("/Assets/settings.png", UriKind.Relative));
@@ -104,6 +108,22 @@ namespace LetsPlay
         {
             NavigationService.Navigate(new Uri("/Settings.xaml", UriKind.Relative));
         }
+
+        private void DeleteClip(object sender, RoutedEventArgs e)
+        {
+            ListBoxItem selectedListBoxItem = myList.ItemContainerGenerator.ContainerFromItem((sender as MenuItem).DataContext) as ListBoxItem;
+            int index = myList.ItemContainerGenerator.IndexFromContainer(selectedListBoxItem);
+            using (IsolatedStorageFile store = IsolatedStorageFile.GetUserStoreForApplication())
+            {
+                var pattern = "\\Shared\\Media\\" + fileNames[index];
+                store.DeleteFile(pattern);
+            }
+            clips.RemoveAt(index);
+            var temp = new List<string>(fileNames);
+            temp.RemoveAt(index);
+            fileNames = temp.ToArray();
+        }
+
     }
 
     class Clip {
